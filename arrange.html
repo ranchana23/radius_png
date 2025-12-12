@@ -458,8 +458,9 @@
       border: 1px solid var(--border);
       display: flex;
       justify-content: center;
-      overflow: auto;
+      align-items: center;
       margin-bottom: 24px;
+      min-height: 400px;
     }
 
     #canvas {
@@ -467,6 +468,11 @@
       box-shadow: 0 2px 8px rgba(0,0,0,0.06);
       background: white;
       border-radius: 8px;
+      max-width: 100%;
+      max-height: 70vh;
+      width: auto;
+      height: auto;
+      object-fit: contain;
     }
 
     .stats {
