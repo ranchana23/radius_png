@@ -6,7 +6,17 @@ const PORT = process.env.PORT || 3000;
 // Serve static files from the root directory
 app.use(express.static(path.join(__dirname, '.')));
 
-// Handle client-side routes by serving index.html
+// Route for arrange page
+app.get('/arrange', (req, res) => {
+  res.sendFile(path.join(__dirname, 'arrange.html'));
+});
+
+// Route for home page
+app.get('/', (req, res) => {
+  res.sendFile(path.join(__dirname, 'index.html'));
+});
+
+// Handle other routes by serving index.html
 app.get('*', (req, res) => {
   res.sendFile(path.join(__dirname, 'index.html'));
 });

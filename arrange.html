@@ -1,0 +1,1056 @@
+<!doctype html>
+<html lang="th">
+
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <title>Image Arranger — จัดเรียงรูปภาพบน A4</title>
+  <link href="https://fonts.googleapis.com/css2?family=Noto+Sans+Thai+Looped:wght@300;400;600;700&display=swap"
+    rel="stylesheet">
+  <script src="https://unpkg.com/@phosphor-icons/web"></script>
+  <style>
+    :root {
+      /* Default Theme: Pastel Dreams (Pink/Blue) */
+      --bg: #FDFBF7;
+      --card: #FFFFFF;
+      --text: #2D3748;
+      --muted: #4A5568;
+      --primary: #AEC6CF;
+      --primary-hover: #9AB5BF;
+      --secondary: #FFB7B2;
+      --secondary-hover: #EFA6A1;
+      --border: #F0F0F0;
+      --shadow: 0 10px 30px rgba(0, 0, 0, 0.03);
+    }
+
+    /* Theme 2: Lavender Garden */
+    [data-theme="lavender"] {
+      --bg: #F8F6FB;
+      --primary: #D4C5E2;
+      --primary-hover: #C0B0D0;
+      --secondary: #E6B8E8;
+      --secondary-hover: #D4A6D6;
+      --border: #F0E6F6;
+    }
+
+    /* Theme 3: Mint Peach */
+    [data-theme="mint"] {
+      --bg: #F6FBF9;
+      --primary: #B8E6D5;
+      --primary-hover: #A4D4C3;
+      --secondary: #FFD4B8;
+      --secondary-hover: #F5C5A6;
+      --border: #E6F6F0;
+    }
+
+    /* Smooth theme transitions */
+    body {
+      transition: background-color 0.3s ease;
+    }
+
+    .card,
+    .sidebar,
+    .btn,
+    .nav-item,
+    .upload-area,
+    .controls {
+      transition: all 0.3s ease;
+    }
+
+    html,
+    body {
+      height: 100%;
+      margin: 0;
+      font-family: 'Noto Sans Thai Looped', sans-serif;
+      background: var(--bg);
+      color: var(--text);
+      -webkit-font-smoothing: antialiased;
+    }
+
+    .app-container {
+      display: flex;
+      min-height: 100vh;
+    }
+
+    .sidebar {
+      width: 240px;
+      background: var(--card);
+      border-right: 1px solid var(--border);
+      padding: 24px 0;
+      display: flex;
+      flex-direction: column;
+      box-shadow: 4px 0 20px rgba(0, 0, 0, 0.02);
+    }
+
+    .sidebar-header {
+      padding: 0 24px 24px;
+      border-bottom: 1px solid var(--border);
+    }
+
+    .sidebar-header h2 {
+      margin: 0;
+      font-size: 18px;
+      font-weight: 600;
+      color: var(--text);
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+
+    .nav-items {
+      padding: 16px 0;
+      flex: 1;
+    }
+
+    .nav-item {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      padding: 12px 24px;
+      color: var(--muted);
+      text-decoration: none;
+      cursor: pointer;
+      transition: all 0.2s ease;
+      font-size: 14px;
+      font-weight: 500;
+      border-left: 3px solid transparent;
+    }
+
+    .nav-item:hover {
+      background: #FAFAFA;
+      color: var(--text);
+    }
+
+    .nav-item.active {
+      background: linear-gradient(90deg, rgba(174, 198, 207, 0.1) 0%, transparent 100%);
+      color: var(--primary);
+      border-left-color: var(--primary);
+    }
+
+    .nav-item i {
+      font-size: 20px;
+    }
+
+    .content {
+      flex: 1;
+      overflow-y: auto;
+    }
+
+    /* Theme Selector Styles */
+    .theme-selector {
+      padding: 16px 24px;
+      border-top: 1px solid var(--border);
+    }
+
+    .theme-selector-label {
+      font-size: 12px;
+      font-weight: 600;
+      color: var(--muted);
+      text-transform: uppercase;
+      letter-spacing: 0.5px;
+      margin-bottom: 12px;
+    }
+
+    .theme-options {
+      display: flex;
+      gap: 12px;
+      justify-content: center;
+    }
+
+    .theme-option {
+      width: 40px;
+      height: 40px;
+      border-radius: 50%;
+      cursor: pointer;
+      border: 3px solid transparent;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      transition: all 0.2s ease;
+      position: relative;
+      overflow: hidden;
+    }
+
+    .theme-option:hover {
+      transform: scale(1.1);
+      box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+    }
+
+    .theme-option.active {
+      border-color: var(--text);
+      box-shadow: 0 0 0 2px white, 0 0 0 4px var(--text);
+    }
+
+    .theme-option.active::after {
+      content: '✓';
+      position: absolute;
+      color: white;
+      font-weight: bold;
+      font-size: 18px;
+      text-shadow: 0 1px 2px rgba(0, 0, 0, 0.3);
+    }
+
+    /* Theme color swatches */
+    .theme-pastel {
+      background: linear-gradient(135deg, #AEC6CF 0%, #FFB7B2 100%);
+    }
+
+    .theme-lavender {
+      background: linear-gradient(135deg, #D4C5E2 0%, #E6B8E8 100%);
+    }
+
+    .theme-mint {
+      background: linear-gradient(135deg, #B8E6D5 0%, #FFD4B8 100%);
+    }
+
+    .wrap {
+      max-width: 1200px;
+      margin: 40px auto;
+      padding: 20px;
+    }
+
+    .page-card {
+      background: var(--card);
+      border-radius: 24px;
+      padding: 40px;
+      box-shadow: var(--shadow);
+      border: 1px solid var(--border);
+    }
+
+    h1 {
+      margin: 0 0 12px;
+      font-size: 24px;
+      font-weight: 600;
+      color: var(--text);
+      letter-spacing: -0.5px;
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+
+    p.lead {
+      margin: 0 0 32px;
+      color: var(--muted);
+      font-size: 15px;
+      line-height: 1.6;
+    }
+
+    .control-section {
+      background: var(--card);
+      padding: 32px;
+      border-radius: 16px;
+      box-shadow: var(--shadow);
+      border: 1px solid var(--border);
+      margin-bottom: 24px;
+    }
+
+    .upload-section {
+      margin-bottom: 32px;
+    }
+
+    .upload-label {
+      display: block;
+      border: 2px dashed #E0E0E0;
+      border-radius: 16px;
+      padding: 40px;
+      text-align: center;
+      cursor: pointer;
+      transition: all 0.2s ease;
+      background: #FAFAFA;
+    }
+
+    .upload-label:hover {
+      border-color: var(--primary);
+      background: #F0F7FA;
+    }
+
+    .upload-label.dragover {
+      border-color: var(--primary);
+      background: #E6F2F7;
+      transform: scale(1.01);
+    }
+
+    .upload-label i {
+      font-size: 48px;
+      color: var(--primary);
+      margin-bottom: 16px;
+      display: block;
+    }
+
+    input[type="file"] {
+      display: none;
+    }
+
+    .settings {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+      gap: 16px;
+      margin-bottom: 20px;
+      background: #FAFAFA;
+      padding: 20px;
+      border-radius: 12px;
+    }
+
+    .setting-group {
+      display: flex;
+      flex-direction: column;
+      gap: 8px;
+    }
+
+    .setting-group label {
+      font-weight: 600;
+      color: var(--text);
+      font-size: 14px;
+    }
+
+    select, input[type="number"] {
+      padding: 8px 12px;
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      font-size: 14px;
+      font-family: inherit;
+      background: var(--card);
+      color: var(--text);
+      outline: none;
+      transition: border-color 0.2s;
+    }
+
+    select:focus, input[type="number"]:focus {
+      border-color: var(--primary);
+    }
+
+    input[type="checkbox"] {
+      width: 18px;
+      height: 18px;
+      cursor: pointer;
+      accent-color: var(--primary);
+    }
+
+    .setting-group label:has(input[type="checkbox"]) {
+      display: flex;
+      align-items: center;
+      cursor: pointer;
+      user-select: none;
+    }
+
+    .button-group {
+      display: flex;
+      gap: 12px;
+      flex-wrap: wrap;
+    }
+
+    button {
+      padding: 10px 20px;
+      border: none;
+      border-radius: 12px;
+      font-size: 14px;
+      font-weight: 600;
+      cursor: pointer;
+      transition: all 0.2s ease;
+      font-family: inherit;
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      gap: 8px;
+    }
+
+    .btn-primary {
+      background: var(--primary);
+      color: var(--text);
+      box-shadow: 0 4px 12px rgba(174, 198, 207, 0.3);
+    }
+
+    .btn-primary:hover {
+      background: var(--primary-hover);
+      transform: translateY(-1px);
+    }
+
+    .btn-primary:active {
+      transform: translateY(0);
+    }
+
+    .btn-secondary {
+      background: var(--secondary);
+      color: var(--text);
+      box-shadow: 0 4px 12px rgba(255, 183, 178, 0.3);
+    }
+
+    .btn-secondary:hover {
+      background: var(--secondary-hover);
+      transform: translateY(-1px);
+    }
+
+    .btn-secondary:active {
+      transform: translateY(0);
+    }
+
+    .btn-outline {
+      background: white;
+      border: 1px solid var(--border);
+      color: var(--text);
+    }
+
+    .btn-outline:hover {
+      background: #f5f5f5;
+    }
+
+    .image-list {
+      background: var(--card);
+      padding: 24px;
+      border-radius: 16px;
+      box-shadow: var(--shadow);
+      border: 1px solid var(--border);
+      margin-bottom: 24px;
+    }
+
+    .image-list h3 {
+      margin: 0 0 16px;
+      color: var(--text);
+      font-size: 16px;
+      font-weight: 600;
+    }
+
+    .image-items {
+      display: grid;
+      grid-template-columns: repeat(auto-fill, minmax(120px, 1fr));
+      gap: 1rem;
+      max-height: 300px;
+      overflow-y: auto;
+    }
+
+    .image-item {
+      position: relative;
+      aspect-ratio: 1;
+      border-radius: 8px;
+      overflow: hidden;
+      box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+    }
+
+    .image-item img {
+      width: 100%;
+      height: 100%;
+      object-fit: cover;
+    }
+
+    .image-item .remove-btn {
+      position: absolute;
+      top: 5px;
+      right: 5px;
+      background: rgba(255, 0, 0, 0.8);
+      color: white;
+      border: none;
+      border-radius: 50%;
+      width: 24px;
+      height: 24px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      cursor: pointer;
+      padding: 0;
+      font-size: 16px;
+    }
+
+    .canvas-container {
+      background: var(--card);
+      padding: 32px;
+      border-radius: 16px;
+      box-shadow: var(--shadow);
+      border: 1px solid var(--border);
+      display: flex;
+      justify-content: center;
+      overflow: auto;
+      margin-bottom: 24px;
+    }
+
+    #canvas {
+      border: 1px solid var(--border);
+      box-shadow: 0 2px 8px rgba(0,0,0,0.06);
+      background: white;
+      border-radius: 8px;
+    }
+
+    .stats {
+      background: var(--card);
+      padding: 24px;
+      border-radius: 16px;
+      box-shadow: var(--shadow);
+      border: 1px solid var(--border);
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+      gap: 16px;
+    }
+
+    .stat-item {
+      text-align: center;
+      padding: 16px;
+      background: #FAFAFA;
+      border-radius: 12px;
+    }
+
+    .stat-value {
+      font-size: 32px;
+      font-weight: 700;
+      color: var(--primary);
+      margin-bottom: 4px;
+    }
+
+    .stat-label {
+      color: var(--muted);
+      font-size: 13px;
+      font-weight: 500;
+    }
+
+    footer {
+      margin-top: 32px;
+      color: var(--muted);
+      font-size: 13px;
+      text-align: center;
+      opacity: 0.7;
+    }
+  </style>
+</head>
+
+<body>
+  <div class="app-container">
+    <!-- Sidebar -->
+    <aside class="sidebar">
+      <div class="sidebar-header">
+        <h2><i class="ph ph-image" style="color: var(--primary);"></i> Image Tools</h2>
+      </div>
+      <nav class="nav-items">
+        <a class="nav-item" href="/">
+          <i class="ph ph-corners-in"></i>
+          <span>Radius</span>
+        </a>
+        <a class="nav-item" href="/auto_crop">
+          <i class="ph ph-crop"></i>
+          <span>Auto Crop</span>
+        </a>
+        <a class="nav-item active">
+          <i class="ph ph-grid-four"></i>
+          <span>Arrange</span>
+        </a>
+      </nav>
+
+      <!-- Theme Selector -->
+      <div class="theme-selector">
+        <div class="theme-selector-label">Theme</div>
+        <div class="theme-options">
+          <div class="theme-option theme-pastel active" data-theme="pastel" title="Pastel Dreams"></div>
+          <div class="theme-option theme-lavender" data-theme="lavender" title="Lavender Garden"></div>
+          <div class="theme-option theme-mint" data-theme="mint" title="Mint Peach"></div>
+        </div>
+      </div>
+    </aside>
+
+    <!-- Main Content -->
+    <main class="content">
+      <div class="wrap">
+        <div class="page-card">
+          <h1><i class="ph ph-grid-four" style="color: var(--primary);"></i> จัดเรียงรูปภาพบนกระดาษ</h1>
+          <p class="lead">อัปโหลดรูป (หลายไฟล์ได้) เลือกขนาดกระดาษ จัดเรียงอัตโนมัติแบบประหยัดพื้นที่ แล้วดาวน์โหลดได้ทันที</p>
+
+          <div class="control-section">
+            <div class="upload-section">
+              <label for="imageInput" class="upload-label" id="uploadArea">
+                <i class="ph ph-cloud-arrow-up"></i>
+                <p style="margin: 0; font-size: 16px; font-weight: 600; color: var(--text);">Click to Upload or Drag & Drop</p>
+                <p style="margin: 8px 0 0; font-size: 13px; color: var(--muted);">รองรับหลายรูปพร้อมกัน (PNG, JPG, JPEG)</p>
+              </label>
+              <input type="file" id="imageInput" accept="image/*" multiple />
+            </div>
+
+            <div class="settings">
+        <div class="setting-group">
+          <label for="paperSize">ขนาดกระดาษ</label>
+          <select id="paperSize">
+            <option value="a4">A4 (210 × 297 mm)</option>
+            <option value="a3">A3 (297 × 420 mm)</option>
+            <option value="letter">Letter (216 × 279 mm)</option>
+          </select>
+        </div>
+
+        <div class="setting-group">
+          <label for="orientation">การวาง</label>
+          <select id="orientation">
+            <option value="portrait">แนวตั้ง (Portrait)</option>
+            <option value="landscape">แนวนอน (Landscape)</option>
+          </select>
+        </div>
+
+        <div class="setting-group">
+          <label for="padding">ระยะห่าง (px)</label>
+          <input type="number" id="padding" value="10" min="0" max="50" />
+        </div>
+
+        <div class="setting-group">
+          <label for="dpi">DPI</label>
+          <select id="dpi">
+            <option value="72">72 (จอ)</option>
+            <option value="150">150 (พิมพ์ทั่วไป)</option>
+            <option value="300" selected>300 (พิมพ์คุณภาพสูง)</option>
+          </select>
+        </div>
+
+        <div class="setting-group">
+          <label for="autoRotate">
+            <input type="checkbox" id="autoRotate" checked style="width: auto; margin-right: 8px;" />
+            หมุนรูปอัตโนมัติ
+          </label>
+        </div>
+      </div>
+
+            <div class="button-group">
+              <button class="btn-primary" onclick="arrangeImages()">
+                <i class="ph ph-magic-wand"></i>
+                จัดเรียงรูปภาพ
+              </button>
+              <button class="btn-secondary" onclick="downloadImage()">
+                <i class="ph ph-download-simple"></i>
+                ดาวน์โหลด
+              </button>
+              <button class="btn-outline" onclick="clearAll()">
+                <i class="ph ph-trash"></i>
+                ล้างทั้งหมด
+              </button>
+            </div>
+          </div>
+
+          <div class="image-list" id="imageListSection" style="display: none;">
+            <h3>รูปภาพที่อัปโหลด (<span id="imageCount">0</span> รูป)</h3>
+            <div class="image-items" id="imageItems"></div>
+          </div>
+
+          <div class="canvas-container">
+            <canvas id="canvas"></canvas>
+          </div>
+
+          <div class="stats">
+            <div class="stat-item">
+              <div class="stat-value" id="placedCount">0</div>
+              <div class="stat-label">รูปที่จัดวางได้</div>
+            </div>
+            <div class="stat-item">
+              <div class="stat-value" id="coverage">0%</div>
+              <div class="stat-label">พื้นที่ใช้งาน</div>
+            </div>
+            <div class="stat-item">
+              <div class="stat-value" id="rotatedCount">0</div>
+              <div class="stat-label">รูปที่หมุน</div>
+            </div>
+            <div class="stat-item">
+              <div class="stat-value" id="efficiency">-</div>
+              <div class="stat-label">ประสิทธิภาพ</div>
+            </div>
+          </div>
+
+          <footer>ไฟล์ที่ได้เป็น PNG — จัดเรียงอัตโนมัติด้วย Bin Packing Algorithm</footer>
+        </div>
+      </div>
+    </main>
+  </div>
+
+  <script>
+    // ============================================
+    // Theme Switching System
+    // ============================================
+
+    const themeOptions = document.querySelectorAll('.theme-option');
+
+    // Load saved theme or default to pastel
+    function loadTheme() {
+      const savedTheme = localStorage.getItem('theme') || 'pastel';
+      applyTheme(savedTheme);
+    }
+
+    // Apply theme to document
+    function applyTheme(themeName) {
+      // Remove all theme classes
+      document.body.removeAttribute('data-theme');
+
+      // Add new theme if not default
+      if (themeName !== 'pastel') {
+        document.body.setAttribute('data-theme', themeName);
+      }
+
+      // Update active state on theme options
+      themeOptions.forEach(option => {
+        if (option.getAttribute('data-theme') === themeName) {
+          option.classList.add('active');
+        } else {
+          option.classList.remove('active');
+        }
+      });
+
+      // Save to localStorage
+      localStorage.setItem('theme', themeName);
+    }
+
+    // Theme option click handlers
+    themeOptions.forEach(option => {
+      option.addEventListener('click', () => {
+        const themeName = option.getAttribute('data-theme');
+        applyTheme(themeName);
+      });
+    });
+
+    // Load theme on page load
+    loadTheme();
+
+    // ============================================
+    // Image Arrange Logic
+    // ============================================
+
+    // Paper sizes in mm
+    const paperSizes = {
+      a4: { width: 210, height: 297 },
+      a3: { width: 297, height: 420 },
+      letter: { width: 216, height: 279 }
+    };
+
+    let uploadedImages = [];
+    let canvas, ctx;
+
+    // Initialize
+    window.onload = () => {
+      canvas = document.getElementById('canvas');
+      ctx = canvas.getContext('2d');
+      updateCanvas();
+      setupDragAndDrop();
+    };
+
+    // Setup drag and drop
+    function setupDragAndDrop() {
+      const uploadArea = document.getElementById('uploadArea');
+      
+      ['dragenter', 'dragover', 'dragleave', 'drop'].forEach(eventName => {
+        uploadArea.addEventListener(eventName, preventDefaults, false);
+      });
+
+      function preventDefaults(e) {
+        e.preventDefault();
+        e.stopPropagation();
+      }
+
+      ['dragenter', 'dragover'].forEach(eventName => {
+        uploadArea.addEventListener(eventName, () => uploadArea.classList.add('dragover'), false);
+      });
+
+      ['dragleave', 'drop'].forEach(eventName => {
+        uploadArea.addEventListener(eventName, () => uploadArea.classList.remove('dragover'), false);
+      });
+
+      uploadArea.addEventListener('drop', (e) => {
+        const dt = e.dataTransfer;
+        const droppedFiles = Array.from(dt.files);
+        handleFiles(droppedFiles);
+      });
+    }
+
+    // Handle file selection
+    document.getElementById('imageInput').addEventListener('change', (e) => {
+      const files = Array.from(e.target.files);
+      handleFiles(files);
+    });
+
+    // Handle files
+    function handleFiles(files) {
+      const uploadArea = document.getElementById('uploadArea');
+      
+      files.forEach(file => {
+        if (file.type.startsWith('image/')) {
+          const reader = new FileReader();
+          reader.onload = (event) => {
+            const img = new Image();
+            img.onload = () => {
+              uploadedImages.push({
+                id: Date.now() + Math.random(),
+                img: img,
+                width: img.width,
+                height: img.height,
+                placed: false
+              });
+              updateImageList();
+            };
+            img.src = event.target.result;
+          };
+          reader.readAsDataURL(file);
+        }
+      });
+
+      // Update UI
+      if (files.length > 0) {
+        const text = files.length === 1 ? files[0].name : `${files.length} files selected`;
+        const p = uploadArea.querySelector('p');
+        p.textContent = text;
+        const icon = uploadArea.querySelector('i');
+        icon.className = 'ph ph-check-circle';
+        icon.style.color = '#4CAF50';
+      }
+    }
+
+    // Update image list display
+    function updateImageList() {
+      const listSection = document.getElementById('imageListSection');
+      const itemsContainer = document.getElementById('imageItems');
+      const countSpan = document.getElementById('imageCount');
+      
+      if (uploadedImages.length > 0) {
+        listSection.style.display = 'block';
+        countSpan.textContent = uploadedImages.length;
+        
+        itemsContainer.innerHTML = '';
+        uploadedImages.forEach((imgData, index) => {
+          const div = document.createElement('div');
+          div.className = 'image-item';
+          div.innerHTML = `
+            <img src="${imgData.img.src}" alt="Image ${index + 1}">
+            <button class="remove-btn" onclick="removeImage(${index})">×</button>
+          `;
+          itemsContainer.appendChild(div);
+        });
+      } else {
+        listSection.style.display = 'none';
+      }
+    }
+
+    // Remove image
+    function removeImage(index) {
+      uploadedImages.splice(index, 1);
+      updateImageList();
+      updateStats(0, 0);
+    }
+
+    // Update canvas size based on paper settings
+    function updateCanvas() {
+      const paperSize = document.getElementById('paperSize').value;
+      const orientation = document.getElementById('orientation').value;
+      const dpi = parseInt(document.getElementById('dpi').value);
+      
+      let size = paperSizes[paperSize];
+      let width = size.width;
+      let height = size.height;
+      
+      if (orientation === 'landscape') {
+        [width, height] = [height, width];
+      }
+      
+      // Convert mm to pixels at given DPI
+      const mmToInch = 1 / 25.4;
+      canvas.width = Math.round(width * mmToInch * dpi);
+      canvas.height = Math.round(height * mmToInch * dpi);
+      
+      // Clear canvas
+      ctx.fillStyle = 'white';
+      ctx.fillRect(0, 0, canvas.width, canvas.height);
+    }
+
+    // Update settings event listeners
+    ['paperSize', 'orientation', 'dpi'].forEach(id => {
+      document.getElementById(id).addEventListener('change', () => {
+        updateCanvas();
+        if (uploadedImages.length > 0) {
+          arrangeImages();
+        }
+      });
+    });
+
+    // Auto rotate checkbox listener
+    document.getElementById('autoRotate').addEventListener('change', () => {
+      if (uploadedImages.length > 0) {
+        arrangeImages();
+      }
+    });
+
+    // Bin packing algorithm with rotation support (Next Fit Decreasing Height)
+    function packImages(images, containerWidth, containerHeight, padding, allowRotation = true) {
+      // Prepare images with both orientations
+      const candidates = [];
+      images.forEach((img, idx) => {
+        // Original orientation
+        candidates.push({
+          ...img,
+          originalIndex: idx,
+          rotated: false,
+          area: img.width * img.height
+        });
+        
+        // Rotated orientation (90 degrees) - only if rotation is allowed
+        if (allowRotation) {
+          candidates.push({
+            ...img,
+            width: img.height,
+            height: img.width,
+            originalIndex: idx,
+            rotated: true,
+            area: img.width * img.height
+          });
+        }
+      });
+      
+      // Sort by area (descending) for better packing
+      const sortedCandidates = candidates.sort((a, b) => b.area - a.area);
+      
+      const packed = [];
+      const usedIndices = new Set();
+      let currentY = padding;
+      let currentX = padding;
+      let rowHeight = 0;
+      
+      sortedCandidates.forEach(imgData => {
+        // Skip if we already placed this image
+        if (usedIndices.has(imgData.originalIndex)) {
+          return;
+        }
+        
+        const imgWidth = imgData.width;
+        const imgHeight = imgData.height;
+        
+        // Try to fit in current row
+        if (currentX + imgWidth + padding <= containerWidth &&
+            currentY + imgHeight + padding <= containerHeight) {
+          // Fits in current row
+          packed.push({
+            ...imgData,
+            x: currentX,
+            y: currentY
+          });
+          usedIndices.add(imgData.originalIndex);
+          currentX += imgWidth + padding;
+          rowHeight = Math.max(rowHeight, imgHeight);
+        } else if (currentX > padding) {
+          // Try next row
+          currentY += rowHeight + padding;
+          currentX = padding;
+          rowHeight = 0;
+          
+          // Check if it fits in new row
+          if (currentY + imgHeight + padding <= containerHeight && 
+              currentX + imgWidth + padding <= containerWidth) {
+            packed.push({
+              ...imgData,
+              x: currentX,
+              y: currentY
+            });
+            usedIndices.add(imgData.originalIndex);
+            currentX += imgWidth + padding;
+            rowHeight = imgHeight;
+          }
+        }
+      });
+      
+      return packed;
+    }
+
+    // Arrange images on canvas
+    function arrangeImages() {
+      if (uploadedImages.length === 0) {
+        alert('กรุณาอัปโหลดรูปภาพก่อน');
+        return;
+      }
+      
+      updateCanvas();
+      
+      const padding = parseInt(document.getElementById('padding').value);
+      const autoRotate = document.getElementById('autoRotate').checked;
+      
+      // Scale images to fit better (max dimension = 1/4 of canvas smaller dimension)
+      const maxDimension = Math.min(canvas.width, canvas.height) / 4;
+      const scaledImages = uploadedImages.map(imgData => {
+        const scale = Math.min(1, maxDimension / Math.max(imgData.width, imgData.height));
+        return {
+          img: imgData.img,
+          width: Math.round(imgData.width * scale),
+          height: Math.round(imgData.height * scale)
+        };
+      });
+      
+      // Pack images with optional rotation
+      const packed = packImages(scaledImages, canvas.width, canvas.height, padding, autoRotate);
+      
+      // Draw packed images with rotation support
+      let rotatedCount = 0;
+      packed.forEach(imgData => {
+        if (imgData.rotated) {
+          rotatedCount++;
+          // Draw rotated image
+          ctx.save();
+          ctx.translate(imgData.x + imgData.width / 2, imgData.y + imgData.height / 2);
+          ctx.rotate(Math.PI / 2); // Rotate 90 degrees
+          ctx.drawImage(
+            imgData.img, 
+            -imgData.height / 2, 
+            -imgData.width / 2, 
+            imgData.height, 
+            imgData.width
+          );
+          ctx.restore();
+          
+          // Draw rotation indicator (small corner badge)
+          ctx.save();
+          ctx.fillStyle = 'rgba(174, 198, 207, 0.8)';
+          ctx.beginPath();
+          ctx.arc(imgData.x + imgData.width - 8, imgData.y + 8, 6, 0, Math.PI * 2);
+          ctx.fill();
+          ctx.fillStyle = 'white';
+          ctx.font = 'bold 10px Arial';
+          ctx.textAlign = 'center';
+          ctx.textBaseline = 'middle';
+          ctx.fillText('↻', imgData.x + imgData.width - 8, imgData.y + 8);
+          ctx.restore();
+        } else {
+          // Draw normal image
+          ctx.drawImage(imgData.img, imgData.x, imgData.y, imgData.width, imgData.height);
+        }
+      });
+      
+      // Calculate coverage
+      const totalImageArea = packed.reduce((sum, img) => sum + (img.width * img.height), 0);
+      const canvasArea = canvas.width * canvas.height;
+      const coverage = (totalImageArea / canvasArea * 100).toFixed(1);
+      
+      updateStats(packed.length, coverage, rotatedCount);
+    }
+
+    // Update statistics
+    function updateStats(placed, coverage, rotatedCount = 0) {
+      document.getElementById('placedCount').textContent = placed;
+      document.getElementById('coverage').textContent = coverage + '%';
+      
+      let efficiency = '-';
+      if (uploadedImages.length > 0) {
+        const percentage = (placed / uploadedImages.length * 100).toFixed(0);
+        efficiency = percentage + '%';
+      }
+      document.getElementById('efficiency').textContent = efficiency;
+      
+      // Update rotated count if element exists
+      const rotatedElement = document.getElementById('rotatedCount');
+      if (rotatedElement) {
+        rotatedElement.textContent = rotatedCount;
+      }
+    }
+
+    // Download canvas as image
+    function downloadImage() {
+      const link = document.createElement('a');
+      link.download = `arranged-images-${Date.now()}.png`;
+      link.href = canvas.toDataURL('image/png');
+      link.click();
+    }
+
+    // Clear all
+    function clearAll() {
+      if (uploadedImages.length > 0 && !confirm('ต้องการล้างรูปภาพทั้งหมดใช่หรือไม่?')) {
+        return;
+      }
+      uploadedImages = [];
+      updateImageList();
+      updateCanvas();
+      updateStats(0, 0);
+      document.getElementById('imageInput').value = '';
+    }
+  </script>
+</body>
+
+</html>

@@ -434,6 +434,10 @@
           <i class="ph ph-crop"></i>
           <span>Auto Crop</span>
         </a>
+        <a class="nav-item" href="/arrange">
+          <i class="ph ph-grid-four"></i>
+          <span>Arrange</span>
+        </a>
       </nav>
 
       <!-- Theme Selector -->
@@ -619,8 +623,12 @@
     // Handle navigation clicks
     navItems.forEach(item => {
       item.addEventListener('click', (e) => {
-        e.preventDefault();
         const targetPage = item.getAttribute('data-page');
+        // Skip if it's an external link (has href but no data-page)
+        if (!targetPage && item.hasAttribute('href')) {
+          return; // Let the browser handle the navigation
+        }
+        e.preventDefault();
         navigateToPage(targetPage, true);
       });
     });
