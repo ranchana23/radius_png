@@ -529,6 +529,18 @@
       text-align: center;
       opacity: 0.7;
     }
+
+    /* Pulse animation for arrange button */
+    @keyframes pulse {
+      0%, 100% {
+        transform: scale(1);
+        box-shadow: 0 4px 12px rgba(174, 198, 207, 0.3);
+      }
+      50% {
+        transform: scale(1.05);
+        box-shadow: 0 6px 20px rgba(174, 198, 207, 0.6);
+      }
+    }
   </style>
 </head>
 
@@ -609,8 +621,8 @@
           <label for="dpi">DPI</label>
           <select id="dpi">
             <option value="72">72 (จอ)</option>
-            <option value="150">150 (พิมพ์ทั่วไป)</option>
-            <option value="300" selected>300 (พิมพ์คุณภาพสูง)</option>
+            <option value="150" selected>150 (พิมพ์ทั่วไป)</option>
+            <option value="300">300 (พิมพ์คุณภาพสูง)</option>
           </select>
         </div>
 
@@ -636,7 +648,7 @@
       </div>
 
             <div class="button-group">
-              <button class="btn-primary" onclick="arrangeImages()">
+              <button class="btn-primary" id="arrangeBtn" onclick="arrangeImages()">
                 <i class="ph ph-magic-wand"></i>
                 จัดเรียงรูปภาพ
               </button>
@@ -745,6 +757,7 @@
 
     let uploadedImages = [];
     let canvas, ctx;
+    let settingsChanged = false;
 
     // Initialize
     window.onload = () => {
@@ -753,7 +766,32 @@
       updateCanvas();
       setupDragAndDrop();
       setupColorSync();
+      setupSettingsWatchers();
     };
+
+    // Mark settings as changed and update button
+    function markSettingsChanged() {
+      settingsChanged = true;
+      const btn = document.getElementById('arrangeBtn');
+      if (uploadedImages.length > 0) {
+        btn.style.animation = 'pulse 1s ease-in-out infinite';
+        btn.innerHTML = '<i class="ph ph-magic-wand"></i> จัดเรียงรูปภาพ (อัปเดต)';
+      }
+    }
+
+    // Setup watchers for all settings
+    function setupSettingsWatchers() {
+      const watchedInputs = ['paperSize', 'orientation', 'dpi', 'padding', 'offset', 'autoRotate'];
+      watchedInputs.forEach(id => {
+        const element = document.getElementById(id);
+        if (element) {
+          element.addEventListener('change', markSettingsChanged);
+          if (element.type === 'number') {
+            element.addEventListener('input', markSettingsChanged);
+          }
+        }
+      });
+    }
 
     // Setup color picker and text input sync
     function setupColorSync() {
@@ -762,9 +800,7 @@
 
       colorPicker.addEventListener('input', (e) => {
         colorText.value = e.target.value.toUpperCase();
-        if (uploadedImages.length > 0) {
-          arrangeImages();
-        }
+        markSettingsChanged();
       });
 
       colorText.addEventListener('input', (e) => {
@@ -774,9 +810,7 @@
         }
         if (/^#[0-9A-Fa-f]{6}$/.test(value)) {
           colorPicker.value = value;
-          if (uploadedImages.length > 0) {
-            arrangeImages();
-          }
+          markSettingsChanged();
         }
       });
 
@@ -911,28 +945,22 @@
       ctx.fillRect(0, 0, canvas.width, canvas.height);
     }
 
-    // Update settings event listeners
+    // Update settings event listeners - only update canvas size, no auto-arrange
     ['paperSize', 'orientation', 'dpi'].forEach(id => {
       document.getElementById(id).addEventListener('change', () => {
         updateCanvas();
-        if (uploadedImages.length > 0) {
-          arrangeImages();
-        }
+        // Don't auto-arrange, let user click button
       });
     });
 
-    // Auto rotate checkbox listener
+    // Auto rotate checkbox listener - no auto-arrange
     document.getElementById('autoRotate').addEventListener('change', () => {
-      if (uploadedImages.length > 0) {
-        arrangeImages();
-      }
+      // Don't auto-arrange, let user click button
     });
 
-    // Offset input listener
+    // Offset input listener - no auto-arrange
     document.getElementById('offset').addEventListener('input', () => {
-      if (uploadedImages.length > 0) {
-        arrangeImages();
-      }
+      // Don't auto-arrange, let user click button
     });
 
     // Bin packing algorithm with rotation support (Next Fit Decreasing Height)
@@ -1021,6 +1049,12 @@
         alert('กรุณาอัปโหลดรูปภาพก่อน');
         return;
       }
+
+      // Reset button state
+      const btn = document.getElementById('arrangeBtn');
+      btn.style.animation = '';
+      btn.innerHTML = '<i class="ph ph-magic-wand"></i> จัดเรียงรูปภาพ';
+      settingsChanged = false;
       
       updateCanvas();
       
