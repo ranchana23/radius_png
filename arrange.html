@@ -1104,38 +1104,54 @@
           const data = imageData.data;
           const newData = tempCtx.createImageData(tempCanvas.width, tempCanvas.height);
           
-          // Apply dilation to create offset effect
+          // Apply dilation with smooth anti-aliased edges
+          const rgb = hexToRgb(offsetColor);
+          
           for (let y = 0; y < tempCanvas.height; y++) {
             for (let x = 0; x < tempCanvas.width; x++) {
               const idx = (y * tempCanvas.width + x) * 4;
               
-              // Check if any pixel in the offset radius is non-transparent
-              let hasPixel = false;
-              for (let dy = -offset; dy <= offset; dy++) {
-                for (let dx = -offset; dx <= offset; dx++) {
+              // Calculate minimum distance to any opaque pixel
+              let minDist = offset + 1;
+              let hasNearbyPixel = false;
+              
+              // Sample in a circular pattern for smoother results
+              const samples = Math.ceil(offset * 2);
+              for (let dy = -offset - 1; dy <= offset + 1; dy++) {
+                for (let dx = -offset - 1; dx <= offset + 1; dx++) {
                   const dist = Math.sqrt(dx * dx + dy * dy);
-                  if (dist <= offset) {
+                  if (dist <= offset + 1) {
                     const nx = x + dx;
                     const ny = y + dy;
                     if (nx >= 0 && nx < tempCanvas.width && ny >= 0 && ny < tempCanvas.height) {
                       const nidx = (ny * tempCanvas.width + nx) * 4;
-                      if (data[nidx + 3] > 0) {
-                        hasPixel = true;
-                        break;
+                      if (data[nidx + 3] > 128) { // Threshold for existing pixel
+                        if (dist < minDist) {
+                          minDist = dist;
+                          hasNearbyPixel = true;
+                        }
                       }
                     }
                   }
                 }
-                if (hasPixel) break;
               }
               
-              if (hasPixel && data[idx + 3] === 0) {
+              if (hasNearbyPixel && data[idx + 3] < 128) {
                 // This is an offset pixel (border area)
-                const rgb = hexToRgb(offsetColor);
+                // Apply anti-aliasing based on distance
+                let alpha = 255;
+                
+                // Smooth falloff at the edge
+                if (minDist > offset - 1) {
+                  // Outer edge smoothing
+                  const edgeDist = offset - minDist;
+                  alpha = Math.max(0, Math.min(255, edgeDist * 255));
+                }
+                
                 newData.data[idx] = rgb.r;
                 newData.data[idx + 1] = rgb.g;
                 newData.data[idx + 2] = rgb.b;
-                newData.data[idx + 3] = 255;
+                newData.data[idx + 3] = alpha;
               } else {
                 // Keep original pixel
                 newData.data[idx] = data[idx];
@@ -1148,10 +1164,22 @@
           
           tempCtx.putImageData(newData, 0, 0);
           
-          // Draw the result on main canvas
-          if (rotation !== 0) {
-            ctx.drawImage(tempCanvas, x - margin, y - margin);
+          // Apply subtle blur for even smoother edges
+          if (offset > 2) {
+            // Create another temp canvas for blur
+            const blurCanvas = document.createElement('canvas');
+            blurCanvas.width = tempCanvas.width;
+            blurCanvas.height = tempCanvas.height;
+            const blurCtx = blurCanvas.getContext('2d');
+            
+            // Apply slight blur
+            blurCtx.filter = 'blur(1px)';
+            blurCtx.drawImage(tempCanvas, 0, 0);
+            
+            // Draw the blurred result on main canvas
+            ctx.drawImage(blurCanvas, x - margin, y - margin);
           } else {
+            // Draw the result on main canvas without blur for small offsets
             ctx.drawImage(tempCanvas, x - margin, y - margin);
           }
         } else {
