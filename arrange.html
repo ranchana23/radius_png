@@ -541,6 +541,22 @@
         box-shadow: 0 6px 20px rgba(174, 198, 207, 0.6);
       }
     }
+
+    /* Spin animation for loading icon */
+    @keyframes spin {
+      0% {
+        transform: rotate(0deg);
+      }
+      100% {
+        transform: rotate(360deg);
+      }
+    }
+
+    /* Disabled button style */
+    button:disabled {
+      opacity: 0.7;
+      cursor: not-allowed;
+    }
   </style>
 </head>
 
@@ -621,8 +637,7 @@
           <label for="dpi">DPI</label>
           <select id="dpi">
             <option value="72">72 (จอ)</option>
-            <option value="150" selected>150 (พิมพ์ทั่วไป)</option>
-            <option value="300">300 (พิมพ์คุณภาพสูง)</option>
+            <option value="96" selected>96 (พิมพ์ทั่วไป)</option>
           </select>
         </div>
 
@@ -1044,17 +1059,22 @@
     }
 
     // Arrange images on canvas
-    function arrangeImages() {
+    async function arrangeImages() {
       if (uploadedImages.length === 0) {
         alert('กรุณาอัปโหลดรูปภาพก่อน');
         return;
       }
 
-      // Reset button state
+      // Show loading state
       const btn = document.getElementById('arrangeBtn');
+      const originalHTML = btn.innerHTML;
+      btn.disabled = true;
       btn.style.animation = '';
-      btn.innerHTML = '<i class="ph ph-magic-wand"></i> จัดเรียงรูปภาพ';
+      btn.innerHTML = '<i class="ph ph-spinner" style="animation: spin 1s linear infinite;"></i> กำลังประมวลผล...';
       settingsChanged = false;
+      
+      // Allow UI to update before heavy computation
+      await new Promise(resolve => setTimeout(resolve, 50));
       
       updateCanvas();
       
@@ -1238,6 +1258,10 @@
       const coverage = (totalImageArea / canvasArea * 100).toFixed(1);
       
       updateStats(packed.length, coverage, rotatedCount);
+      
+      // Reset button state after completion
+      btn.disabled = false;
+      btn.innerHTML = '<i class="ph ph-magic-wand"></i> จัดเรียงรูปภาพ';
     }
 
     // Update statistics
