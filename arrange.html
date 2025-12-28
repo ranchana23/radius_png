@@ -489,6 +489,11 @@
       width: auto;
       height: auto;
       object-fit: contain;
+      cursor: grab;
+    }
+
+    #canvas.dragging {
+      cursor: grabbing;
     }
 
     /* Canvas background options */
@@ -808,6 +813,13 @@
     let uploadedImages = [];
     let canvas, ctx;
     let settingsChanged = false;
+    let placedImages = []; // Track placed images with positions
+    let selectedImageIndex = -1;
+    let isDragging = false;
+    let dragOffsetX = 0;
+    let dragOffsetY = 0;
+    let cachedImages = new Map(); // Cache rendered images with offset
+    let animationFrameId = null;
 
     // Initialize
     window.onload = () => {
@@ -818,6 +830,7 @@
       setupColorSync();
       setupSettingsWatchers();
       setupCanvasBgControl();
+      setupCanvasInteraction();
     };
 
     // Mark settings as changed and update button
@@ -840,6 +853,271 @@
           if (element.type === 'number') {
             element.addEventListener('input', markSettingsChanged);
           }
+        }
+      });
+    }
+
+    // Setup canvas interaction for dragging images
+    function setupCanvasInteraction() {
+      canvas.addEventListener('mousedown', handleCanvasMouseDown);
+      canvas.addEventListener('mousemove', handleCanvasMouseMove);
+      canvas.addEventListener('mouseup', handleCanvasMouseUp);
+      canvas.addEventListener('mouseleave', handleCanvasMouseUp);
+    }
+
+    // Get mouse position relative to canvas
+    function getMousePos(e) {
+      const rect = canvas.getBoundingClientRect();
+      const scaleX = canvas.width / rect.width;
+      const scaleY = canvas.height / rect.height;
+      return {
+        x: (e.clientX - rect.left) * scaleX,
+        y: (e.clientY - rect.top) * scaleY
+      };
+    }
+
+    // Find which image is at the given position (check from top to bottom)
+    function findImageAtPosition(x, y) {
+      for (let i = placedImages.length - 1; i >= 0; i--) {
+        const img = placedImages[i];
+        if (x >= img.x && x <= img.x + img.width &&
+            y >= img.y && y <= img.y + img.height) {
+          return i;
+        }
+      }
+      return -1;
+    }
+
+    // Handle mouse down on canvas
+    function handleCanvasMouseDown(e) {
+      const pos = getMousePos(e);
+      const imgIndex = findImageAtPosition(pos.x, pos.y);
+      
+      if (imgIndex !== -1) {
+        selectedImageIndex = imgIndex;
+        isDragging = true;
+        const img = placedImages[imgIndex];
+        dragOffsetX = pos.x - img.x;
+        dragOffsetY = pos.y - img.y;
+        canvas.classList.add('dragging');
+        redrawCanvas();
+      }
+    }
+
+    // Handle mouse move on canvas
+    function handleCanvasMouseMove(e) {
+      if (isDragging && selectedImageIndex !== -1) {
+        // Cancel previous animation frame
+        if (animationFrameId) {
+          cancelAnimationFrame(animationFrameId);
+        }
+        
+        // Use requestAnimationFrame for smooth updates
+        animationFrameId = requestAnimationFrame(() => {
+          const pos = getMousePos(e);
+          const img = placedImages[selectedImageIndex];
+          
+          // Update position
+          img.x = pos.x - dragOffsetX;
+          img.y = pos.y - dragOffsetY;
+          
+          // Constrain to canvas bounds
+          img.x = Math.max(0, Math.min(canvas.width - img.width, img.x));
+          img.y = Math.max(0, Math.min(canvas.height - img.height, img.y));
+          
+          redrawCanvas(true); // Pass true to skip offset calculation while dragging
+        });
+      } else {
+        // Check if hovering over an image
+        const pos = getMousePos(e);
+        const imgIndex = findImageAtPosition(pos.x, pos.y);
+        canvas.style.cursor = imgIndex !== -1 ? 'grab' : 'default';
+      }
+    }
+
+    // Handle mouse up on canvas
+    function handleCanvasMouseUp(e) {
+      if (isDragging) {
+        isDragging = false;
+        canvas.classList.remove('dragging');
+        // Redraw with full quality (with offset effects)
+        redrawCanvas(false);
+      }
+    }
+
+    // Redraw canvas with all images and selection highlight
+    function redrawCanvas(skipOffset = false) {
+      // Clear canvas
+      ctx.clearRect(0, 0, canvas.width, canvas.height);
+      
+      const offset = skipOffset ? 0 : (parseInt(document.getElementById('offset').value) || 0);
+      const offsetColor = document.getElementById('offsetColor').value;
+      
+      // Helper function to draw image with offset/border following the shape
+      function drawImageWithOffset(img, x, y, width, height, rotation = 0, useCache = false) {
+        // Create cache key
+        const cacheKey = `${img.src}_${width}_${height}_${rotation}_${offset}_${offsetColor}`;
+        
+        // Use cached version if available and not dragging
+        if (!skipOffset && useCache && cachedImages.has(cacheKey)) {
+          const cached = cachedImages.get(cacheKey);
+          ctx.drawImage(cached.canvas, x - cached.offsetX, y - cached.offsetY);
+          return;
+        }
+        if (offset > 0) {
+          // Create temporary canvas for offset effect
+          const tempCanvas = document.createElement('canvas');
+          const margin = offset * 3;
+          tempCanvas.width = width + margin * 2;
+          tempCanvas.height = height + margin * 2;
+          const tempCtx = tempCanvas.getContext('2d');
+          
+          if (rotation !== 0) {
+            tempCtx.save();
+            tempCtx.translate(tempCanvas.width / 2, tempCanvas.height / 2);
+            tempCtx.rotate(rotation);
+            tempCtx.drawImage(img, -height / 2, -width / 2, height, width);
+            tempCtx.restore();
+          } else {
+            tempCtx.drawImage(img, margin, margin, width, height);
+          }
+          
+          const imageData = tempCtx.getImageData(0, 0, tempCanvas.width, tempCanvas.height);
+          const data = imageData.data;
+          const newData = tempCtx.createImageData(tempCanvas.width, tempCanvas.height);
+          
+          const rgb = hexToRgb(offsetColor);
+          
+          for (let y = 0; y < tempCanvas.height; y++) {
+            for (let x = 0; x < tempCanvas.width; x++) {
+              const idx = (y * tempCanvas.width + x) * 4;
+              let minDist = offset + 1;
+              let hasNearbyPixel = false;
+              
+              for (let dy = -offset - 1; dy <= offset + 1; dy++) {
+                for (let dx = -offset - 1; dx <= offset + 1; dx++) {
+                  const dist = Math.sqrt(dx * dx + dy * dy);
+                  if (dist <= offset + 1) {
+                    const nx = x + dx;
+                    const ny = y + dy;
+                    if (nx >= 0 && nx < tempCanvas.width && ny >= 0 && ny < tempCanvas.height) {
+                      const nidx = (ny * tempCanvas.width + nx) * 4;
+                      if (data[nidx + 3] > 128) {
+                        if (dist < minDist) {
+                          minDist = dist;
+                          hasNearbyPixel = true;
+                        }
+                      }
+                    }
+                  }
+                }
+              }
+              
+              if (hasNearbyPixel && data[idx + 3] < 128) {
+                let alpha = 255;
+                if (minDist > offset - 1) {
+                  const edgeDist = offset - minDist;
+                  alpha = Math.max(0, Math.min(255, edgeDist * 255));
+                }
+                newData.data[idx] = rgb.r;
+                newData.data[idx + 1] = rgb.g;
+                newData.data[idx + 2] = rgb.b;
+                newData.data[idx + 3] = alpha;
+              } else {
+                newData.data[idx] = data[idx];
+                newData.data[idx + 1] = data[idx + 1];
+                newData.data[idx + 2] = data[idx + 2];
+                newData.data[idx + 3] = data[idx + 3];
+              }
+            }
+          }
+          
+          tempCtx.putImageData(newData, 0, 0);
+          
+          if (offset > 2) {
+            const blurCanvas = document.createElement('canvas');
+            blurCanvas.width = tempCanvas.width;
+            blurCanvas.height = tempCanvas.height;
+            const blurCtx = blurCanvas.getContext('2d');
+            blurCtx.filter = 'blur(1px)';
+            blurCtx.drawImage(tempCanvas, 0, 0);
+            
+            // Cache the result if not skipping offset
+            if (!skipOffset) {
+              cachedImages.set(cacheKey, { canvas: blurCanvas, offsetX: margin, offsetY: margin });
+            }
+            
+            ctx.drawImage(blurCanvas, x - margin, y - margin);
+          } else {
+            // Cache the result if not skipping offset
+            if (!skipOffset && offset > 0) {
+              cachedImages.set(cacheKey, { canvas: tempCanvas, offsetX: margin, offsetY: margin });
+            }
+            
+            ctx.drawImage(tempCanvas, x - margin, y - margin);
+          }
+        } else {
+          if (rotation !== 0) {
+            ctx.save();
+            ctx.translate(x + width / 2, y + height / 2);
+            ctx.rotate(rotation);
+            ctx.drawImage(img, -height / 2, -width / 2, height, width);
+            ctx.restore();
+          } else {
+            ctx.drawImage(img, x, y, width, height);
+          }
+        }
+      }
+      
+      function hexToRgb(hex) {
+        const result = /^#?([a-f\d]{2})([a-f\d]{2})([a-f\d]{2})$/i.exec(hex);
+        return result ? {
+          r: parseInt(result[1], 16),
+          g: parseInt(result[2], 16),
+          b: parseInt(result[3], 16)
+        } : { r: 255, g: 255, b: 255 };
+      }
+      
+      // Draw all images
+      placedImages.forEach((imgData, index) => {
+        // Use cache for non-dragged images
+        const useCache = !skipOffset && index !== selectedImageIndex;
+        
+        if (imgData.rotated) {
+          drawImageWithOffset(imgData.img, imgData.x, imgData.y, imgData.width, imgData.height, Math.PI / 2, useCache);
+          
+          // Draw rotation indicator
+          ctx.save();
+          ctx.fillStyle = 'rgba(174, 198, 207, 0.8)';
+          ctx.beginPath();
+          ctx.arc(imgData.x + imgData.width - 8, imgData.y + 8, 6, 0, Math.PI * 2);
+          ctx.fill();
+          ctx.fillStyle = 'white';
+          ctx.font = 'bold 10px Arial';
+          ctx.textAlign = 'center';
+          ctx.textBaseline = 'middle';
+          ctx.fillText('↻', imgData.x + imgData.width - 8, imgData.y + 8);
+          ctx.restore();
+        } else {
+          drawImageWithOffset(imgData.img, imgData.x, imgData.y, imgData.width, imgData.height, 0, useCache);
+        }
+        
+        // Highlight selected image
+        if (index === selectedImageIndex) {
+          ctx.save();
+          ctx.strokeStyle = 'rgba(174, 198, 207, 0.8)';
+          ctx.lineWidth = 3;
+          ctx.setLineDash([5, 5]);
+          ctx.strokeRect(imgData.x - 2, imgData.y - 2, imgData.width + 4, imgData.height + 4);
+          
+          // Draw corner handles
+          const handleSize = 8;
+          ctx.fillStyle = 'rgba(174, 198, 207, 0.9)';
+          ctx.fillRect(imgData.x - handleSize/2, imgData.y - handleSize/2, handleSize, handleSize);
+          ctx.fillRect(imgData.x + imgData.width - handleSize/2, imgData.y - handleSize/2, handleSize, handleSize);
+          ctx.fillRect(imgData.x - handleSize/2, imgData.y + imgData.height - handleSize/2, handleSize, handleSize);
+          ctx.fillRect(imgData.x + imgData.width - handleSize/2, imgData.y + imgData.height - handleSize/2, handleSize, handleSize);
+          ctx.restore();
         }
       });
     }
@@ -1190,6 +1468,11 @@
       // Pack images with optional rotation
       const packed = packImages(scaledImages, canvas.width, canvas.height, padding, autoRotate);
       
+      // Store packed images for interaction
+      placedImages = packed;
+      selectedImageIndex = -1; // Reset selection
+      cachedImages.clear(); // Clear cache for new arrangement
+      
       // Helper function to draw image with offset/border following the shape
       function drawImageWithOffset(img, x, y, width, height, rotation = 0) {
         if (offset > 0) {
@@ -1317,38 +1600,22 @@
         } : { r: 255, g: 255, b: 255 };
       }
       
-      // Draw packed images with rotation and offset support
+      // Calculate stats
       let rotatedCount = 0;
       packed.forEach(imgData => {
         if (imgData.rotated) {
           rotatedCount++;
-          // Draw rotated image with offset
-          drawImageWithOffset(imgData.img, imgData.x, imgData.y, imgData.width, imgData.height, Math.PI / 2);
-          
-          // Draw rotation indicator (small corner badge)
-          ctx.save();
-          ctx.fillStyle = 'rgba(174, 198, 207, 0.8)';
-          ctx.beginPath();
-          ctx.arc(imgData.x + imgData.width - 8, imgData.y + 8, 6, 0, Math.PI * 2);
-          ctx.fill();
-          ctx.fillStyle = 'white';
-          ctx.font = 'bold 10px Arial';
-          ctx.textAlign = 'center';
-          ctx.textBaseline = 'middle';
-          ctx.fillText('↻', imgData.x + imgData.width - 8, imgData.y + 8);
-          ctx.restore();
-        } else {
-          // Draw normal image with offset
-          drawImageWithOffset(imgData.img, imgData.x, imgData.y, imgData.width, imgData.height, 0);
         }
       });
       
-      // Calculate coverage
       const totalImageArea = packed.reduce((sum, img) => sum + (img.width * img.height), 0);
       const canvasArea = canvas.width * canvas.height;
       const coverage = (totalImageArea / canvasArea * 100).toFixed(1);
       
       updateStats(packed.length, coverage, rotatedCount);
+      
+      // Draw all images using redraw function
+      redrawCanvas();
       
       // Reset button state after completion
       btn.disabled = false;
@@ -1388,6 +1655,8 @@
         return;
       }
       uploadedImages = [];
+      placedImages = [];
+      selectedImageIndex = -1;
       updateImageList();
       updateCanvas();
       updateStats(0, 0);
