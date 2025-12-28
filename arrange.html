@@ -648,7 +648,7 @@
 
         <div class="setting-group">
           <label for="padding">ระยะห่าง (px)</label>
-          <input type="number" id="padding" value="10" min="0" max="50" />
+          <input type="number" id="padding" value="1" min="0" max="50" />
         </div>
 
         <div class="setting-group">
@@ -1335,27 +1335,48 @@
     });
 
     // Bin packing algorithm with rotation support (Next Fit Decreasing Height)
-    function packImages(images, containerWidth, containerHeight, padding, allowRotation = true) {
+    function packImages(images, containerWidth, containerHeight, padding, allowRotation = true, offsetSize = 0, dpi = 96) {
+      // Convert mm to pixels for spacing between images with offset
+      const mmToPixels = (mm) => {
+        const inches = mm / 25.4;
+        return Math.round(inches * dpi);
+      };
+      
+      // No extra spacing when there's offset - images with offset will be tight but not overlapping
+      const extraSpacing = 0;
+      
       // Prepare images with both orientations
       const candidates = [];
       images.forEach((img, idx) => {
+        // Calculate actual space needed including offset effect
+        // offset * 2 because offset expands on both sides
+        const actualWidth = img.width + (offsetSize * 2);
+        const actualHeight = img.height + (offsetSize * 2);
+        
         // Original orientation
         candidates.push({
           ...img,
           originalIndex: idx,
           rotated: false,
-          area: img.width * img.height
+          area: actualWidth * actualHeight,
+          packWidth: actualWidth,
+          packHeight: actualHeight
         });
         
         // Rotated orientation (90 degrees) - only if rotation is allowed
         if (allowRotation) {
+          const rotatedWidth = img.height + (offsetSize * 2);
+          const rotatedHeight = img.width + (offsetSize * 2);
+          
           candidates.push({
             ...img,
             width: img.height,
             height: img.width,
             originalIndex: idx,
             rotated: true,
-            area: img.width * img.height
+            area: rotatedWidth * rotatedHeight,
+            packWidth: rotatedWidth,
+            packHeight: rotatedHeight
           });
         }
       });
@@ -1375,37 +1396,40 @@
           return;
         }
         
-        const imgWidth = imgData.width;
-        const imgHeight = imgData.height;
+        // Use packWidth/packHeight which includes offset space
+        const imgWidth = imgData.packWidth;
+        const imgHeight = imgData.packHeight;
+        const effectivePadding = padding + extraSpacing;
         
         // Try to fit in current row
-        if (currentX + imgWidth + padding <= containerWidth &&
-            currentY + imgHeight + padding <= containerHeight) {
+        if (currentX + imgWidth + effectivePadding <= containerWidth &&
+            currentY + imgHeight + effectivePadding <= containerHeight) {
           // Fits in current row
+          // Store position adjusted for offset (center the actual image)
           packed.push({
             ...imgData,
-            x: currentX,
-            y: currentY
+            x: currentX + offsetSize,
+            y: currentY + offsetSize
           });
           usedIndices.add(imgData.originalIndex);
-          currentX += imgWidth + padding;
+          currentX += imgWidth + effectivePadding;
           rowHeight = Math.max(rowHeight, imgHeight);
         } else if (currentX > padding) {
           // Try next row
-          currentY += rowHeight + padding;
+          currentY += rowHeight + effectivePadding;
           currentX = padding;
           rowHeight = 0;
           
           // Check if it fits in new row
-          if (currentY + imgHeight + padding <= containerHeight && 
-              currentX + imgWidth + padding <= containerWidth) {
+          if (currentY + imgHeight + effectivePadding <= containerHeight && 
+              currentX + imgWidth + effectivePadding <= containerWidth) {
             packed.push({
               ...imgData,
-              x: currentX,
-              y: currentY
+              x: currentX + offsetSize,
+              y: currentY + offsetSize
             });
             usedIndices.add(imgData.originalIndex);
-            currentX += imgWidth + padding;
+            currentX += imgWidth + effectivePadding;
             rowHeight = imgHeight;
           }
         }
@@ -1465,8 +1489,8 @@
       const offset = parseInt(document.getElementById('offset').value) || 0;
       const offsetColor = document.getElementById('offsetColor').value;
       
-      // Pack images with optional rotation
-      const packed = packImages(scaledImages, canvas.width, canvas.height, padding, autoRotate);
+      // Pack images with optional rotation and offset spacing
+      const packed = packImages(scaledImages, canvas.width, canvas.height, padding, autoRotate, offset, dpi);
       
       // Store packed images for interaction
       placedImages = packed;
