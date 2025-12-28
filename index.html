@@ -434,7 +434,7 @@
           <i class="ph ph-crop"></i>
           <span>Auto Crop</span>
         </a>
-        <a class="nav-item" href="/arrange">
+        <a class="nav-item" href="./arrange.html">
           <i class="ph ph-grid-four"></i>
           <span>Arrange</span>
         </a>
@@ -613,11 +613,17 @@
       });
     }
 
-    // Get page name from URL path
+    // Get page name from URL path or hash
     function getPageFromPath(path) {
       if (path === '/auto_crop') return 'autocrop';
       if (path === '/radius') return 'radius';
       return 'radius'; // default
+    }
+
+    function getPageFromHash(hash) {
+      if (hash === '#auto_crop') return 'autocrop';
+      if (hash === '#radius') return 'radius';
+      return null;
     }
 
     // Handle navigation clicks
@@ -639,8 +645,18 @@
       navigateToPage(pageName, false);
     });
 
+    // Handle hash navigation (for links from arrange.html)
+    window.addEventListener('hashchange', () => {
+      const pageName = getPageFromHash(window.location.hash);
+      if (pageName) {
+        navigateToPage(pageName, true);
+        // Clear hash
+        history.replaceState({ page: pageName }, document.title, pageConfig[pageName].path);
+      }
+    });
+
     // Initialize on page load
-    const initialPage = getPageFromPath(window.location.pathname);
+    let initialPage = getPageFromHash(window.location.hash) || getPageFromPath(window.location.pathname);
     navigateToPage(initialPage, false);
     // Set initial state
     history.replaceState({ page: initialPage }, document.title, pageConfig[initialPage].path);
