@@ -483,6 +483,16 @@
     #canvas {
       border: 1px solid var(--border);
       box-shadow: 0 2px 8px rgba(0,0,0,0.06);
+      border-radius: 8px;
+      max-width: 100%;
+      max-height: 70vh;
+      width: auto;
+      height: auto;
+      object-fit: contain;
+    }
+
+    /* Canvas background options */
+    .canvas-container.bg-transparent #canvas {
       /* Transparent checkerboard pattern background */
       background-image: 
         linear-gradient(45deg, #e0e0e0 25%, transparent 25%),
@@ -492,12 +502,6 @@
       background-size: 20px 20px;
       background-position: 0 0, 0 10px, 10px -10px, -10px 0px;
       background-color: #f5f5f5;
-      border-radius: 8px;
-      max-width: 100%;
-      max-height: 70vh;
-      width: auto;
-      height: auto;
-      object-fit: contain;
     }
 
     .stats {
@@ -669,6 +673,23 @@
         </div>
 
         <div class="setting-group">
+          <label for="canvasBgColor">สีพื้น Canvas</label>
+          <select id="canvasBgColor">
+            <option value="transparent">Transparent</option>
+            <option value="white" >ขาว (White)</option>
+            <option value="lightgray">เทาอ่อน (Light Gray) </option>
+            <option value="gray" selected>เทา (Gray)</option>
+            <option value="black">ดำ (Black)</option>
+            <option value="custom">กำหนดเอง (Custom)</option>
+          </select>
+        </div>
+
+        <div class="setting-group" id="customBgColorGroup" style="display: none;">
+          <label for="customCanvasBg">สีกำหนดเอง</label>
+          <input type="color" id="customCanvasBg" value="#f0f0f0" style="width: 100%; height: 36px; padding: 4px; cursor: pointer;" />
+        </div>
+
+        <div class="setting-group">
           <label for="autoRotate">
             <input type="checkbox" id="autoRotate" checked style="width: auto; margin-right: 8px;" />
             หมุนรูปอัตโนมัติ
@@ -796,6 +817,7 @@
       setupDragAndDrop();
       setupColorSync();
       setupSettingsWatchers();
+      setupCanvasBgControl();
     };
 
     // Mark settings as changed and update button
@@ -810,7 +832,7 @@
 
     // Setup watchers for all settings
     function setupSettingsWatchers() {
-      const watchedInputs = ['paperSize', 'orientation', 'dpi', 'padding', 'imageSize', 'offset', 'autoRotate'];
+      const watchedInputs = ['paperSize', 'orientation', 'dpi', 'padding', 'imageSize', 'offset', 'autoRotate', 'canvasBgColor', 'customCanvasBg'];
       watchedInputs.forEach(id => {
         const element = document.getElementById(id);
         if (element) {
@@ -820,6 +842,49 @@
           }
         }
       });
+    }
+
+    // Setup canvas background color control
+    function setupCanvasBgControl() {
+      const bgSelect = document.getElementById('canvasBgColor');
+      const customGroup = document.getElementById('customBgColorGroup');
+      const customColor = document.getElementById('customCanvasBg');
+      const canvasContainer = document.querySelector('.canvas-container');
+
+      function updateCanvasBackground() {
+        const bgValue = bgSelect.value;
+        const canvas = document.getElementById('canvas');
+        
+        // Remove all bg classes
+        canvasContainer.classList.remove('bg-transparent');
+        
+        if (bgValue === 'transparent') {
+          canvasContainer.classList.add('bg-transparent');
+          canvas.style.backgroundColor = 'transparent';
+        } else if (bgValue === 'custom') {
+          canvas.style.backgroundColor = customColor.value;
+        } else {
+          canvas.style.backgroundColor = bgValue;
+        }
+      }
+
+      bgSelect.addEventListener('change', () => {
+        if (bgSelect.value === 'custom') {
+          customGroup.style.display = 'flex';
+        } else {
+          customGroup.style.display = 'none';
+        }
+        updateCanvasBackground();
+      });
+
+      customColor.addEventListener('input', () => {
+        if (bgSelect.value === 'custom') {
+          updateCanvasBackground();
+        }
+      });
+
+      // Initialize
+      updateCanvasBackground();
     }
 
     // Setup color picker and text input sync
