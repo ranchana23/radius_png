@@ -472,12 +472,58 @@
       border-radius: 16px;
       box-shadow: var(--shadow);
       border: 1px solid var(--border);
-      display: flex;
-      justify-content: center;
-      align-items: center;
       margin-bottom: 24px;
       min-height: 400px;
       position: relative;
+    }
+    
+    .canvas-wrapper {
+      display: flex;
+      justify-content: center;
+      align-items: center;
+      position: relative;
+    }
+    
+    .page-navigation {
+      display: flex;
+      justify-content: center;
+      align-items: center;
+      gap: 16px;
+      margin-top: 16px;
+      padding-top: 16px;
+      border-top: 1px solid var(--border);
+    }
+    
+    .page-nav-btn {
+      padding: 8px 16px;
+      border: none;
+      border-radius: 8px;
+      background: var(--primary);
+      color: var(--text);
+      font-weight: 600;
+      cursor: pointer;
+      transition: all 0.2s;
+      display: flex;
+      align-items: center;
+      gap: 6px;
+    }
+    
+    .page-nav-btn:hover:not(:disabled) {
+      background: var(--primary-hover);
+      transform: translateY(-1px);
+    }
+    
+    .page-nav-btn:disabled {
+      opacity: 0.3;
+      cursor: not-allowed;
+    }
+    
+    .page-info {
+      font-weight: 600;
+      color: var(--text);
+      padding: 8px 16px;
+      background: #FAFAFA;
+      border-radius: 8px;
     }
 
     #canvas {
@@ -723,14 +769,33 @@
             <div class="image-items" id="imageItems"></div>
           </div>
 
-          <div class="canvas-container">
-            <canvas id="canvas"></canvas>
+          <div class="canvas-container" id="canvasContainer">
+            <div class="canvas-wrapper">
+              <canvas id="canvas"></canvas>
+            </div>
+            <div class="page-navigation" id="pageNavigation" style="display: none;">
+              <button class="page-nav-btn" id="prevPageBtn" onclick="previousPage()">
+                <i class="ph ph-caret-left"></i>
+                ก่อนหน้า
+              </button>
+              <div class="page-info">
+                หน้า <span id="currentPageNum">1</span> / <span id="totalPageNum">1</span>
+              </div>
+              <button class="page-nav-btn" id="nextPageBtn" onclick="nextPage()">
+                ถัดไป
+                <i class="ph ph-caret-right"></i>
+              </button>
+            </div>
           </div>
 
           <div class="stats">
             <div class="stat-item">
               <div class="stat-value" id="placedCount">0</div>
               <div class="stat-label">รูปที่จัดวางได้</div>
+            </div>
+            <div class="stat-item">
+              <div class="stat-value" id="pageCount">1</div>
+              <div class="stat-label">จำนวนหน้า</div>
             </div>
             <div class="stat-item">
               <div class="stat-value" id="coverage">0%</div>
@@ -814,6 +879,8 @@
     let canvas, ctx;
     let settingsChanged = false;
     let placedImages = []; // Track placed images with positions
+    let allPages = []; // Track all pages for multi-page support
+    let currentPage = 0;
     let selectedImageIndex = -1;
     let isDragging = false;
     let dragOffsetX = 0;
@@ -878,8 +945,11 @@
 
     // Find which image is at the given position (check from top to bottom)
     function findImageAtPosition(x, y) {
-      for (let i = placedImages.length - 1; i >= 0; i--) {
-        const img = placedImages[i];
+      if (allPages.length === 0 || !allPages[currentPage]) return -1;
+      
+      const currentPageImages = allPages[currentPage].images;
+      for (let i = currentPageImages.length - 1; i >= 0; i--) {
+        const img = currentPageImages[i];
         if (x >= img.x && x <= img.x + img.width &&
             y >= img.y && y <= img.y + img.height) {
           return i;
@@ -890,13 +960,15 @@
 
     // Handle mouse down on canvas
     function handleCanvasMouseDown(e) {
+      if (allPages.length === 0 || !allPages[currentPage]) return;
+      
       const pos = getMousePos(e);
       const imgIndex = findImageAtPosition(pos.x, pos.y);
       
       if (imgIndex !== -1) {
         selectedImageIndex = imgIndex;
         isDragging = true;
-        const img = placedImages[imgIndex];
+        const img = allPages[currentPage].images[imgIndex];
         dragOffsetX = pos.x - img.x;
         dragOffsetY = pos.y - img.y;
         canvas.classList.add('dragging');
@@ -906,7 +978,7 @@
 
     // Handle mouse move on canvas
     function handleCanvasMouseMove(e) {
-      if (isDragging && selectedImageIndex !== -1) {
+      if (isDragging && selectedImageIndex !== -1 && allPages[currentPage]) {
         // Cancel previous animation frame
         if (animationFrameId) {
           cancelAnimationFrame(animationFrameId);
@@ -915,7 +987,7 @@
         // Use requestAnimationFrame for smooth updates
         animationFrameId = requestAnimationFrame(() => {
           const pos = getMousePos(e);
-          const img = placedImages[selectedImageIndex];
+          const img = allPages[currentPage].images[selectedImageIndex];
           
           // Update position
           img.x = pos.x - dragOffsetX;
@@ -950,8 +1022,16 @@
       // Clear canvas
       ctx.clearRect(0, 0, canvas.width, canvas.height);
       
+      // If no pages, nothing to draw
+      if (allPages.length === 0 || !allPages[currentPage]) {
+        return;
+      }
+      
       const offset = parseInt(document.getElementById('offset').value) || 0;
       const offsetColor = document.getElementById('offsetColor').value;
+      
+      // Get images for current page
+      const currentPageImages = allPages[currentPage].images;
       
       // Helper function to draw image with offset/border following the shape
       function drawImageWithOffset(img, x, y, width, height, rotation = 0, useCache = false) {
@@ -1078,8 +1158,8 @@
         } : { r: 255, g: 255, b: 255 };
       }
       
-      // Draw all images
-      placedImages.forEach((imgData, index) => {
+      // Draw all images on current page
+      currentPageImages.forEach((imgData, index) => {
         // Use cache for all images including dragged one
         const useCache = true;
         
@@ -1489,13 +1569,50 @@
       const offset = parseInt(document.getElementById('offset').value) || 0;
       const offsetColor = document.getElementById('offsetColor').value;
       
-      // Pack images with optional rotation and offset spacing
-      const packed = packImages(scaledImages, canvas.width, canvas.height, padding, autoRotate, offset, dpi);
+      // Pack images with optional rotation and offset spacing - MULTI-PAGE SUPPORT
+      allPages = []; // Reset pages
+      let remainingImages = [...scaledImages];
+      let pageNumber = 1;
       
-      // Store packed images for interaction
-      placedImages = packed;
+      while (remainingImages.length > 0) {
+        const packed = packImages(remainingImages, canvas.width, canvas.height, padding, autoRotate, offset, dpi);
+        
+        if (packed.length === 0) {
+          // Cannot fit any more images, break to avoid infinite loop
+          console.warn(`Cannot fit ${remainingImages.length} remaining images`);
+          break;
+        }
+        
+        // Store this page
+        allPages.push({
+          images: packed,
+          pageNumber: pageNumber
+        });
+        
+        // Remove packed images from remaining
+        const packedIndices = new Set(packed.map(p => p.originalIndex));
+        remainingImages = remainingImages.filter((img, idx) => {
+          // Find if this image was packed
+          let wasPacked = false;
+          packed.forEach(p => {
+            if (p.img === img.img && !wasPacked) {
+              wasPacked = true;
+            }
+          });
+          return !wasPacked;
+        });
+        
+        pageNumber++;
+      }
+      
+      // Display first page initially
+      currentPage = 0;
+      placedImages = allPages[0]?.images || [];
       selectedImageIndex = -1; // Reset selection
       cachedImages.clear(); // Clear cache for new arrangement
+      
+      // Update canvas container to show all pages
+      updateCanvasDisplay();
       
       // Helper function to draw image with offset/border following the shape
       function drawImageWithOffset(img, x, y, width, height, rotation = 0) {
@@ -1624,19 +1741,25 @@
         } : { r: 255, g: 255, b: 255 };
       }
       
-      // Calculate stats
-      let rotatedCount = 0;
-      packed.forEach(imgData => {
-        if (imgData.rotated) {
-          rotatedCount++;
-        }
+      // Calculate stats for all pages
+      let totalPlaced = 0;
+      let totalRotated = 0;
+      allPages.forEach(page => {
+        totalPlaced += page.images.length;
+        page.images.forEach(imgData => {
+          if (imgData.rotated) {
+            totalRotated++;
+          }
+        });
       });
       
-      const totalImageArea = packed.reduce((sum, img) => sum + (img.width * img.height), 0);
-      const canvasArea = canvas.width * canvas.height;
-      const coverage = (totalImageArea / canvasArea * 100).toFixed(1);
+      const totalImageArea = allPages.reduce((sum, page) => {
+        return sum + page.images.reduce((pageSum, img) => pageSum + (img.width * img.height), 0);
+      }, 0);
+      const totalCanvasArea = canvas.width * canvas.height * allPages.length;
+      const coverage = (totalImageArea / totalCanvasArea * 100).toFixed(1);
       
-      updateStats(packed.length, coverage, rotatedCount);
+      updateStats(totalPlaced, coverage, totalRotated, allPages.length);
       
       // Draw all images using redraw function
       redrawCanvas();
@@ -1645,10 +1768,185 @@
       btn.disabled = false;
       btn.innerHTML = '<i class="ph ph-magic-wand"></i> จัดเรียงรูปภาพ';
     }
+    
+    // Update canvas display to show current page only
+    function updateCanvasDisplay() {
+      if (allPages.length === 0) return;
+      
+      // Show/hide page navigation
+      const pageNav = document.getElementById('pageNavigation');
+      const prevBtn = document.getElementById('prevPageBtn');
+      const nextBtn = document.getElementById('nextPageBtn');
+      
+      if (allPages.length > 1) {
+        pageNav.style.display = 'flex';
+        document.getElementById('currentPageNum').textContent = currentPage + 1;
+        document.getElementById('totalPageNum').textContent = allPages.length;
+        
+        // Update button states
+        prevBtn.disabled = (currentPage === 0);
+        nextBtn.disabled = (currentPage === allPages.length - 1);
+      } else {
+        pageNav.style.display = 'none';
+      }
+      
+      // Draw current page
+      const page = allPages[currentPage];
+      const pageCtx = canvas.getContext('2d');
+      pageCtx.clearRect(0, 0, canvas.width, canvas.height);
+      
+      const offset = parseInt(document.getElementById('offset').value) || 0;
+      const offsetColor = document.getElementById('offsetColor').value;
+      
+      // Draw images on current page
+      page.images.forEach((imgData) => {
+        drawImageOnCanvas(pageCtx, imgData, offset, offsetColor);
+      });
+    }
+    
+    // Navigate to previous page
+    function previousPage() {
+      if (currentPage > 0) {
+        currentPage--;
+        updateCanvasDisplay();
+      }
+    }
+    
+    // Navigate to next page
+    function nextPage() {
+      if (currentPage < allPages.length - 1) {
+        currentPage++;
+        updateCanvasDisplay();
+      }
+    }
+    
+    // Helper function to draw image on specific canvas
+    function drawImageOnCanvas(ctx, imgData, offset, offsetColor) {
+      function drawImageWithOffset(img, x, y, width, height, rotation = 0) {
+        if (offset > 0) {
+          const tempCanvas = document.createElement('canvas');
+          const margin = offset * 3;
+          tempCanvas.width = width + margin * 2;
+          tempCanvas.height = height + margin * 2;
+          const tempCtx = tempCanvas.getContext('2d');
+          
+          if (rotation !== 0) {
+            tempCtx.save();
+            tempCtx.translate(tempCanvas.width / 2, tempCanvas.height / 2);
+            tempCtx.rotate(rotation);
+            tempCtx.drawImage(img, -height / 2, -width / 2, height, width);
+            tempCtx.restore();
+          } else {
+            tempCtx.drawImage(img, margin, margin, width, height);
+          }
+          
+          const imageData = tempCtx.getImageData(0, 0, tempCanvas.width, tempCanvas.height);
+          const data = imageData.data;
+          const newData = tempCtx.createImageData(tempCanvas.width, tempCanvas.height);
+          const rgb = hexToRgb(offsetColor);
+          
+          for (let y = 0; y < tempCanvas.height; y++) {
+            for (let x = 0; x < tempCanvas.width; x++) {
+              const idx = (y * tempCanvas.width + x) * 4;
+              let minDist = offset + 1;
+              let hasNearbyPixel = false;
+              
+              for (let dy = -offset - 1; dy <= offset + 1; dy++) {
+                for (let dx = -offset - 1; dx <= offset + 1; dx++) {
+                  const dist = Math.sqrt(dx * dx + dy * dy);
+                  if (dist <= offset + 1) {
+                    const nx = x + dx;
+                    const ny = y + dy;
+                    if (nx >= 0 && nx < tempCanvas.width && ny >= 0 && ny < tempCanvas.height) {
+                      const nidx = (ny * tempCanvas.width + nx) * 4;
+                      if (data[nidx + 3] > 128) {
+                        if (dist < minDist) {
+                          minDist = dist;
+                          hasNearbyPixel = true;
+                        }
+                      }
+                    }
+                  }
+                }
+              }
+              
+              if (hasNearbyPixel && data[idx + 3] < 128) {
+                let alpha = 255;
+                if (minDist > offset - 1) {
+                  const edgeDist = offset - minDist;
+                  alpha = Math.max(0, Math.min(255, edgeDist * 255));
+                }
+                newData.data[idx] = rgb.r;
+                newData.data[idx + 1] = rgb.g;
+                newData.data[idx + 2] = rgb.b;
+                newData.data[idx + 3] = alpha;
+              } else {
+                newData.data[idx] = data[idx];
+                newData.data[idx + 1] = data[idx + 1];
+                newData.data[idx + 2] = data[idx + 2];
+                newData.data[idx + 3] = data[idx + 3];
+              }
+            }
+          }
+          
+          tempCtx.putImageData(newData, 0, 0);
+          
+          if (offset > 2) {
+            const blurCanvas = document.createElement('canvas');
+            blurCanvas.width = tempCanvas.width;
+            blurCanvas.height = tempCanvas.height;
+            const blurCtx = blurCanvas.getContext('2d');
+            blurCtx.filter = 'blur(1px)';
+            blurCtx.drawImage(tempCanvas, 0, 0);
+            ctx.drawImage(blurCanvas, x - margin, y - margin);
+          } else {
+            ctx.drawImage(tempCanvas, x - margin, y - margin);
+          }
+        } else {
+          if (rotation !== 0) {
+            ctx.save();
+            ctx.translate(x + width / 2, y + height / 2);
+            ctx.rotate(rotation);
+            ctx.drawImage(img, -height / 2, -width / 2, height, width);
+            ctx.restore();
+          } else {
+            ctx.drawImage(img, x, y, width, height);
+          }
+        }
+      }
+      
+      function hexToRgb(hex) {
+        const result = /^#?([a-f\d]{2})([a-f\d]{2})([a-f\d]{2})$/i.exec(hex);
+        return result ? {
+          r: parseInt(result[1], 16),
+          g: parseInt(result[2], 16),
+          b: parseInt(result[3], 16)
+        } : { r: 255, g: 255, b: 255 };
+      }
+      
+      if (imgData.rotated) {
+        drawImageWithOffset(imgData.img, imgData.x, imgData.y, imgData.width, imgData.height, Math.PI / 2);
+        
+        ctx.save();
+        ctx.fillStyle = 'rgba(174, 198, 207, 0.8)';
+        ctx.beginPath();
+        ctx.arc(imgData.x + imgData.width - 8, imgData.y + 8, 6, 0, Math.PI * 2);
+        ctx.fill();
+        ctx.fillStyle = 'white';
+        ctx.font = 'bold 10px Arial';
+        ctx.textAlign = 'center';
+        ctx.textBaseline = 'middle';
+        ctx.fillText('↻', imgData.x + imgData.width - 8, imgData.y + 8);
+        ctx.restore();
+      } else {
+        drawImageWithOffset(imgData.img, imgData.x, imgData.y, imgData.width, imgData.height, 0);
+      }
+    }
 
     // Update statistics
-    function updateStats(placed, coverage, rotatedCount = 0) {
+    function updateStats(placed, coverage, rotatedCount = 0, pageCount = 1) {
       document.getElementById('placedCount').textContent = placed;
+      document.getElementById('pageCount').textContent = pageCount;
       document.getElementById('coverage').textContent = coverage + '%';
       
       let efficiency = '-';
@@ -1667,7 +1965,7 @@
 
     // Download canvas as image with high resolution
     async function downloadImage() {
-      if (placedImages.length === 0) {
+      if (allPages.length === 0 || !allPages[0]?.images || allPages[0].images.length === 0) {
         alert('ยังไม่มีรูปภาพที่จัดเรียง กรุณาจัดเรียงรูปภาพก่อน');
         return;
       }
@@ -1687,8 +1985,14 @@
       // Allow UI to update
       await new Promise(resolve => setTimeout(resolve, 50));
       
-      // Create high-resolution canvas for download (2x for balance of quality and speed)
-      const scale = 2;
+      // Download each page separately
+      for (let pageIdx = 0; pageIdx < allPages.length; pageIdx++) {
+        const page = allPages[pageIdx];
+        btn.innerHTML = `<i class="ph ph-spinner" style="animation: spin 1s linear infinite;"></i> กำลังสร้างหน้า ${pageIdx + 1}/${allPages.length}...`;
+        await new Promise(resolve => setTimeout(resolve, 50));
+        
+        // Create high-resolution canvas for download (2x for balance of quality and speed)
+        const scale = 2;
       const highResCanvas = document.createElement('canvas');
       highResCanvas.width = canvas.width * scale;
       highResCanvas.height = canvas.height * scale;
@@ -1809,9 +2113,9 @@
         } : { r: 255, g: 255, b: 255 };
       }
       
-      // Draw all images on high-res canvas
-      for (let i = 0; i < placedImages.length; i++) {
-        const imgData = placedImages[i];
+      // Draw all images on high-res canvas for this page
+      for (let i = 0; i < page.images.length; i++) {
+        const imgData = page.images[i];
         if (imgData.rotated) {
           drawImageWithOffsetHighRes(imgData.img, imgData.x, imgData.y, imgData.width, imgData.height, Math.PI / 2);
         } else {
@@ -1820,7 +2124,7 @@
         
         // Allow UI to breathe every 3 images
         if (i % 3 === 0 && i > 0) {
-          btn.innerHTML = `<i class="ph ph-spinner" style="animation: spin 1s linear infinite;"></i> กำลังสร้างไฟล์... (${i}/${placedImages.length})`;
+          btn.innerHTML = `<i class="ph ph-spinner" style="animation: spin 1s linear infinite;"></i> หน้า ${pageIdx + 1}: (${i}/${page.images.length})`;
           await new Promise(resolve => setTimeout(resolve, 1));
         }
       }
@@ -1830,9 +2134,16 @@
       
       // Download the high-res canvas
       const link = document.createElement('a');
-      link.download = `arranged-images-${Date.now()}.png`;
+      const pageSuffix = allPages.length > 1 ? `-page${pageIdx + 1}` : '';
+      link.download = `arranged-images${pageSuffix}-${Date.now()}.png`;
       link.href = dataUrl;
       link.click();
+      
+      // Small delay between downloads
+      if (pageIdx < allPages.length - 1) {
+        await new Promise(resolve => setTimeout(resolve, 200));
+      }
+    }
       
       // Restore button state
       btn.disabled = false;
@@ -1852,10 +2163,12 @@
       }
       uploadedImages = [];
       placedImages = [];
+      allPages = [];
+      currentPage = 0;
       selectedImageIndex = -1;
       updateImageList();
       updateCanvas();
-      updateStats(0, 0);
+      updateStats(0, 0, 0, 1);
       document.getElementById('imageInput').value = '';
     }
   </script>
