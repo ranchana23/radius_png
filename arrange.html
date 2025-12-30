@@ -925,7 +925,7 @@
           img.x = Math.max(0, Math.min(canvas.width - img.width, img.x));
           img.y = Math.max(0, Math.min(canvas.height - img.height, img.y));
           
-          redrawCanvas(true); // Pass true to skip offset calculation while dragging
+          redrawCanvas(false); // Show offset while dragging
         });
       } else {
         // Check if hovering over an image
@@ -950,7 +950,7 @@
       // Clear canvas
       ctx.clearRect(0, 0, canvas.width, canvas.height);
       
-      const offset = skipOffset ? 0 : (parseInt(document.getElementById('offset').value) || 0);
+      const offset = parseInt(document.getElementById('offset').value) || 0;
       const offsetColor = document.getElementById('offsetColor').value;
       
       // Helper function to draw image with offset/border following the shape
@@ -958,8 +958,8 @@
         // Create cache key
         const cacheKey = `${img.src}_${width}_${height}_${rotation}_${offset}_${offsetColor}`;
         
-        // Use cached version if available and not dragging
-        if (!skipOffset && useCache && cachedImages.has(cacheKey)) {
+        // Use cached version if available
+        if (useCache && cachedImages.has(cacheKey)) {
           const cached = cachedImages.get(cacheKey);
           ctx.drawImage(cached.canvas, x - cached.offsetX, y - cached.offsetY);
           return;
@@ -1042,15 +1042,15 @@
             blurCtx.filter = 'blur(1px)';
             blurCtx.drawImage(tempCanvas, 0, 0);
             
-            // Cache the result if not skipping offset
-            if (!skipOffset) {
+            // Cache the result
+            if (offset > 0) {
               cachedImages.set(cacheKey, { canvas: blurCanvas, offsetX: margin, offsetY: margin });
             }
             
             ctx.drawImage(blurCanvas, x - margin, y - margin);
           } else {
-            // Cache the result if not skipping offset
-            if (!skipOffset && offset > 0) {
+            // Cache the result
+            if (offset > 0) {
               cachedImages.set(cacheKey, { canvas: tempCanvas, offsetX: margin, offsetY: margin });
             }
             
@@ -1080,8 +1080,8 @@
       
       // Draw all images
       placedImages.forEach((imgData, index) => {
-        // Use cache for non-dragged images
-        const useCache = !skipOffset && index !== selectedImageIndex;
+        // Use cache for all images including dragged one
+        const useCache = true;
         
         if (imgData.rotated) {
           drawImageWithOffset(imgData.img, imgData.x, imgData.y, imgData.width, imgData.height, Math.PI / 2, useCache);
